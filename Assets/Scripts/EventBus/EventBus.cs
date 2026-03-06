@@ -3,7 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public enum EventType { 
-    
+    TimeRewindStart,// 回溯
+    TimeRewindEnd,
+    TimeSlowStart,// 减速
+    TimeSlowEnd,
+    TimeFastForwardStart,// 快进
+    TimeFastForwardEnd,
+
 }
 public class EventBus 
 {
