@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿// PlayerAction.cs
+using UnityEngine;
 
 /// <summary>
 /// 玩家行为控制脚本，负责处理玩家的移动、攻击等行为。
