@@ -1,6 +1,9 @@
 ﻿// TimeControlManager.cs
 using UnityEngine;
 
+/// <summary>
+///  时间控制管理器，负责处理时间快进、减速和回溯的逻辑。
+/// </summary>
 public class TimeControlManager : MonoBehaviour
 {
     public static TimeControlManager Instance { get; private set; }// 单例模式，方便全局访问
