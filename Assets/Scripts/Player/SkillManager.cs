@@ -1,6 +1,9 @@
 ﻿// SkillManager.cs
 using UnityEngine;
 
+/// <summary>
+///  技能管理器，负责监听玩家输入并发布相应的时间控制事件。
+/// </summary>
 public class SkillManager : MonoBehaviour
 {
     private void Update()
