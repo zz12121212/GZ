@@ -18,6 +18,7 @@ public class PlayerAction : MonoBehaviour
 
     void Start()
     {
+        // 自动获取组件，如果未设置
         if (rb == null)
         {
             rb = GetComponent<Rigidbody2D>();
@@ -28,12 +29,12 @@ public class PlayerAction : MonoBehaviour
             animator = GetComponent<Animator>();
             Debug.Log("Animator组件未设置，已自动获取。");
         }
-
         if (rb != null)
         {
             rb.freezeRotation = true;
             Debug.Log("Rigidbody2D组件已设置，冻结旋转。");
         }
+
     }
 
     void Update()
@@ -59,7 +60,7 @@ public class PlayerAction : MonoBehaviour
         }
     }
 
-    private void FixedUpdate()
+    void FixedUpdate()
     {
         if (rb != null)
         {
@@ -72,4 +73,5 @@ public class PlayerAction : MonoBehaviour
             rb.MovePosition(targetPosition);
         }
     }
+
 }
