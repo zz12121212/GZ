@@ -35,6 +35,24 @@ public class PlayerAction : MonoBehaviour
             Debug.Log("Rigidbody2D组件已设置，冻结旋转。");
         }
 
+        // 注册时间事件监听器
+        EventBus.registerEvent(EventType.TimeFastForwardStart, OnTimeFastForwardStart);
+        EventBus.registerEvent(EventType.TimeFastForwardEnd, OnTimeFastForwardEnd);
+        EventBus.registerEvent(EventType.TimeSlowStart, OnTimeSlowStart);
+        EventBus.registerEvent(EventType.TimeSlowEnd, OnTimeSlowEnd);
+        EventBus.registerEvent(EventType.TimeRewindStart, OnTimeRewindStart);
+        EventBus.registerEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
+    }
+
+    void OnDestroy()
+    {
+        // 注销时间事件监听器，防止内存泄漏
+        EventBus.disRegisterEvent(EventType.TimeFastForwardStart, OnTimeFastForwardStart);
+        EventBus.disRegisterEvent(EventType.TimeFastForwardEnd, OnTimeFastForwardEnd);
+        EventBus.disRegisterEvent(EventType.TimeSlowStart, OnTimeSlowStart);
+        EventBus.disRegisterEvent(EventType.TimeSlowEnd, OnTimeSlowEnd);
+        EventBus.disRegisterEvent(EventType.TimeRewindStart, OnTimeRewindStart);
+        EventBus.disRegisterEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
     }
 
     void Update()
@@ -57,6 +75,7 @@ public class PlayerAction : MonoBehaviour
             {
                 animator.speed = 1f;
             }
+            Debug.Log($"TimeScale: {Time.timeScale}, AnimatorSpeed: {animator.speed}");
         }
     }
 
@@ -66,12 +85,40 @@ public class PlayerAction : MonoBehaviour
         {
             float timeScaleFactor = Time.timeScale > 0.0001f ? 1f / Time.timeScale : 1f;
 
-            // 位移 = 输入 * 速度 * (固定时间步长 * 时间缩放因子)
-            Vector2 movement = moveInput * moveSpeed * (Time.fixedDeltaTime * Time.timeScale);
+            // 位移 = 输入 * 速度 * 固定时间步长 / 时间缩放因子
+            Vector2 movement = moveInput * moveSpeed * Time.fixedDeltaTime / Time.timeScale;
             Vector2 targetPosition = rb.position + movement;
 
             rb.MovePosition(targetPosition);
         }
     }
 
+    // 时间事件处理函数
+    void OnTimeFastForwardStart()
+    {
+        animator.SetTrigger("AttackE");
+        Debug.Log("时间快进开始，玩家触发E技能动画");
+    }
+    void OnTimeFastForwardEnd()
+    {
+        
+    }
+    void OnTimeSlowStart()
+    {
+        animator.SetTrigger("AttackQ");
+        Debug.Log("时间慢速开始，玩家触发Q技能动画");
+    }
+    void OnTimeSlowEnd()
+    {
+        
+    }
+    void OnTimeRewindStart()
+    {
+        animator.SetTrigger("AttackR");
+        Debug.Log("时间倒流开始，玩家触发R技能动画");
+    }
+    void OnTimeRewindEnd()
+    {
+        
+    }
 }
