@@ -34,6 +34,40 @@ public class RewindableEntity: MonoBehaviour
         return history.Count;
     }
 
+    // 注册到全局管理器，确保在回溯过程中能被正确处理
+    private void OnEnable()
+    {
+        if (GlobalRewindManager.Instance != null)
+        {
+            GlobalRewindManager.Instance.RegisterEntity(this);
+        }
+
+        EventBus.registerEvent(EventType.TimeRewindStart, OnTimeRewindStart);
+        EventBus.registerEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
+    }
+    // 注销时从全局管理器移除，避免回溯过程中访问已销毁的实体
+    private void OnDisable()
+    {
+        if (GlobalRewindManager.Instance != null)
+        {
+            GlobalRewindManager.Instance.UnregisterEntity(this);
+        }
+
+        EventBus.disRegisterEvent(EventType.TimeRewindStart, OnTimeRewindStart);
+        EventBus.disRegisterEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
+    }
+
+    // 回溯开始和结束的事件处理函数
+    private void OnTimeRewindStart()
+    {
+        SetRewindMode(true);
+    }
+    private void OnTimeRewindEnd()
+    {
+        SetRewindMode(false);
+    }
+
+    // 记录当前状态到历史缓冲区，应该在FixedUpdate中调用，确保物理状态同步
     public void RecordState()
     {
         EntityState state = new EntityState
