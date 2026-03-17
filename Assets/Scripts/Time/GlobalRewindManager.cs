@@ -29,6 +29,7 @@ public class GlobalRewindManager : MonoBehaviour
         else
         {
             Destroy(gameObject);
+            return;
         }
     }
 
@@ -37,25 +38,21 @@ public class GlobalRewindManager : MonoBehaviour
 
         // 注册时间事件监听器
         EventBus.registerEvent(EventType.TimeRewindStart, OnTimeRewindStart);
-        EventBus.registerEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
     }
 
     // 每帧记录所有实体状态
     private void FixedUpdate()
     {
-        if (!isRewinding)
+        if(isRewinding)
         {
-            foreach (var entity in allEntities)
+            return;// 回溯过程中不记录状态，避免干扰回溯
+        }
+
+        foreach (var entity in allEntities)
+        {
+            if (entity != null)
             {
-                if (entity != null)
-                {
-                    entity.RecordState();
-                }
-                else
-                {
-                    // 如果实体被销毁了，从列表中移除
-                    allEntities.Remove(entity);
-                }
+                entity.RecordState();
             }
         }
 
@@ -64,10 +61,6 @@ public class GlobalRewindManager : MonoBehaviour
     public void OnTimeRewindStart()
     {
         StartRewind();
-    }
-    public void OnTimeRewindEnd()
-    {
-
     }
 
     // 开始回溯
@@ -87,17 +80,20 @@ public class GlobalRewindManager : MonoBehaviour
 
         // 计算深度
         int minDepth = GetMinHistoryDepth();// 获取所有实体中最短的历史记录深度，确保回溯时不会越界
-        int totalFrames = Mathf.CeilToInt(rewindDuration / Time.fixedDeltaTime);// 计算总共需要回溯的帧数
-
-        Debug.Log($"[倒流启动] 涉及物体数：{allEntities.Count}");
-        Debug.Log($"[倒流启动] 需要回溯帧数：{totalFrames}帧");
-        Debug.Log($"[倒流启动] 实际可用最小历史帧数：{minDepth}帧");
 
         if (minDepth <= 0)
         {
             Debug.Log("没有足够的历史记录，无法开始回溯");
             return;
         }
+
+        // 计算需要回溯的帧数
+        float fixedDt = Time.fixedDeltaTime > 0 ? Time.fixedDeltaTime : 0.02f;// 确保fixedDeltaTime有效，默认0.02秒
+        int totalFramesNeeded = Mathf.CeilToInt(rewindDuration / fixedDt);// 根据回溯持续时间和fixedDeltaTime计算需要回溯的总帧数
+
+        int framesToRewind = Mathf.Min(totalFramesNeeded, minDepth);// 实际回溯的帧数不能超过最短历史记录深度
+
+        Debug.Log($"[回溯准备] 实体数={allEntities.Count},目标帧={framesToRewind},速度={rewindSpeed}");
 
         isRewinding = true;
 
@@ -125,51 +121,38 @@ public class GlobalRewindManager : MonoBehaviour
         return minDepth == int.MaxValue ? 0 : minDepth;// 如果没有实体，返回0
     }
 
-    private IEnumerator RewindProcess(int availableFrames)
+    private IEnumerator RewindProcess(int totalFrames)
     {
-        Debug.Log($"[倒流过程] 开始回溯，实际可用帧数：{availableFrames}帧");
-
+        // 步长：速度越快，每次跳过的帧数越多
         int step = Mathf.Max(1,Mathf.CeilToInt(rewindSpeed));// 计算每次回溯的步长，确保每次至少回溯1帧
+
+        //每次迭代的时间：速度越快，每次迭代的时间越短
+        float fixedDt = Time.fixedDeltaTime > 0 ? Time.fixedDeltaTime : 0.02f;// 确保fixedDeltaTime有效，默认0.02秒
+        float waitTime = fixedDt / rewindSpeed;// 计算每次回溯之间的等待时间，确保回溯速度正确
+
         int currentOffset = 0;
 
-        int maxOffset = availableFrames;
-        Debug.Log($"[倒流过程] 每次回溯步长：{step}帧，最大偏移：{maxOffset}帧");
-
-        if(maxOffset <= 0)
-        {
-            Debug.Log("没有足够的历史记录，无法开始回溯");
-            isRewinding = false;
-            yield break;
-        }
-
-        float waitTime = Time.fixedDeltaTime / rewindSpeed;// 计算每次回溯之间的等待时间，确保回溯速度正确
-        int loopCount = 0;
-
-        while (currentOffset < maxOffset)
+        while (currentOffset < totalFrames)
         {
             foreach (var entity in allEntities)
             {
-                if (entity != null)
+                if (entity != null && entity.TryGetStateAtOffset(currentOffset, out EntityState state))
                 {
-                    entity.TryGetStateAtOffSet(currentOffset, out EntityState state);
                     entity.ApplyState(state);
                 }
             }
             currentOffset += step;
-            loopCount++;
-            // Debug.Log($"[倒流过程] 回溯第{loopCount}次，当前偏移：{currentOffset}帧");
             yield return new WaitForSecondsRealtime(waitTime);// 使用WaitForSecondsRealtime确保回溯过程不受Time.timeScale影响
         }
-        Debug.Log($"[倒流过程] 回溯完成，总共回溯了{currentOffset}帧，实际回溯时间：{loopCount * waitTime:F2}秒");
 
         // 确保最后停在最远的那一帧
-        if (maxOffset > 0)
+        int finalOffset = totalFrames - 1;
+        if (finalOffset >= 0)
         {
             foreach (var entity in allEntities)
             {
-                if (entity != null)
+                if (entity != null && entity.TryGetStateAtOffset(currentOffset, out EntityState state))
                 {
-                    entity.TryGetStateAtOffSet(maxOffset - 1, out EntityState state);
                     entity.ApplyState(state);
                 }
             }

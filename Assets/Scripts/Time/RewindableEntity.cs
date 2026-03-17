@@ -5,10 +5,12 @@ using System.Collections.Generic;
 [System.Serializable]
 public struct EntityState
 {
-    public Vector3 position;// 实体位置
-    public Quaternion rotation;// 实体旋转
-    public Vector3 velocity;// 实体速度
-    public Vector3 angularVelocity;// 实体角速度
+    public Vector2 position;// 实体位置
+    public float rotation;// 实体旋转
+    public Vector2 velocity;// 实体速度
+    public float angularVelocity;// 实体角速度
+
+
 }
 
 public class RewindableEntity: MonoBehaviour
@@ -18,46 +20,43 @@ public class RewindableEntity: MonoBehaviour
     public int maxFrames = 150;// 最大记录帧数，约等于3秒
 
     private Rigidbody2D rb;
-    private Animator animator;
+    private Animator animator; 
 
-    private List<EntityState> history = new List<EntityState>();// 状态缓冲区
+    private List<EntityState> history;// 状态历史缓冲区
+    private int writeIndex = 0;// 当前写入位置
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
+        history = new List<EntityState>(maxFrames);
     }
 
-    // 方便外部查询当前历史记录数量
-    public int GetHistoryCount()
-    {
-        return history.Count;
-    }
+    public int GetHistoryCount() => history.Count;
 
-    // 注册到全局管理器，确保在回溯过程中能被正确处理
     private void OnEnable()
     {
-        if (GlobalRewindManager.Instance != null)
-        {
-            GlobalRewindManager.Instance.RegisterEntity(this);
-        }
+        GlobalRewindManager.Instance?.RegisterEntity(this);// 注册到全局管理器
 
         EventBus.registerEvent(EventType.TimeRewindStart, OnTimeRewindStart);
         EventBus.registerEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
     }
-    // 注销时从全局管理器移除，避免回溯过程中访问已销毁的实体
+
     private void OnDisable()
     {
-        if (GlobalRewindManager.Instance != null)
-        {
-            GlobalRewindManager.Instance.UnregisterEntity(this);
-        }
-
+        GlobalRewindManager.Instance?.UnregisterEntity(this);// 注销
         EventBus.disRegisterEvent(EventType.TimeRewindStart, OnTimeRewindStart);
         EventBus.disRegisterEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
     }
 
-    // 回溯开始和结束的事件处理函数
+    private void OnDestroy()
+    {
+        if (GlobalRewindManager.Instance != null)
+        {
+            GlobalRewindManager.Instance.UnregisterEntity(this);// 注销
+        }
+    }
+
     private void OnTimeRewindStart()
     {
         SetRewindMode(true);
@@ -70,30 +69,38 @@ public class RewindableEntity: MonoBehaviour
     // 记录当前状态到历史缓冲区，应该在FixedUpdate中调用，确保物理状态同步
     public void RecordState()
     {
-        EntityState state = new EntityState
-        {
-            position = transform.position,
-            rotation = transform.rotation
-        };
+        EntityState state;
 
-        // 需要恢复速度时记录速度相关信息，节省内存
-        if (restoreVelocity)
+        if (restoreVelocity && rb != null)
         {
-            state.velocity = new Vector3(rb.velocity.x, rb.velocity.y, 0);
-            state.angularVelocity = new Vector3(0, 0, rb.angularVelocity);
+            state = new EntityState
+            {
+                position = rb.position, // 直接使用刚体位置，避免 Transform 和 Rigibody 不同步
+                rotation = rb.rotation,
+                velocity = rb.velocity,
+                angularVelocity = rb.angularVelocity
+            };
+        }
+        else
+        {
+            state = new EntityState
+            {
+                position = rb ? rb.position : transform.position,
+                rotation = rb ? rb.rotation : transform.eulerAngles.z,
+                velocity = Vector2.zero,
+                angularVelocity = 0
+            };
         }
 
         history.Add(state);
 
-        // 超出最大帧数时丢弃最旧的状态
         if (history.Count > maxFrames)
         {
             history.RemoveAt(0);
         }
     }
 
-    // 回溯到指定历史状态，offset为0表示回到上一个状态，1表示上上个状态，以此类推
-    public bool TryGetStateAtOffSet(int offset, out EntityState state)
+    public bool TryGetStateAtOffset(int offset, out EntityState state)
     {
         int index = history.Count - 1 - offset;
         if (index >= 0 && index < history.Count)
@@ -105,36 +112,68 @@ public class RewindableEntity: MonoBehaviour
         return false;
     }
 
-    // 应用历史状态到实体
     public void ApplyState(EntityState state)
     {
-        transform.position = state.position;
-        transform.rotation = state.rotation;
-        // 如果有刚体，必须同步刚体状态，否则物理引擎会把位置拉回去
-        if (restoreVelocity)
+        if (rb != null)
         {
-            if(rb != null)
+            // 直接设置刚体位置和旋转
+            rb.position = state.position;
+            rb.rotation = state.rotation;
+
+            // 设置速度
+            if (restoreVelocity)
             {
-                rb.velocity = new Vector2(state.velocity.x, state.velocity.y);
-                rb.angularVelocity = state.angularVelocity.z;
-                // 直接设置位置，避免物理引擎干扰
-                rb.MovePosition(state.position);
-                rb.WakeUp();
+                rb.velocity = state.velocity;
+                rb.angularVelocity = state.angularVelocity;
             }
+            else
+            {
+                // 不回溯速度时，必须清零，防止残留速度导致漂移
+                rb.velocity = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+
+            // 唤醒刚体 (确保它不是 Sleep 状态)
+            rb.WakeUp();
+
+            // 注意：这里不需要手动设置 transform.position/rotation
+            // 因为 rb.position 赋值后，Unity 会自动同步到 transform (除非 rb.simulated=false 时同步有延迟，但在下一帧渲染前通常会同步)
+            // 为了视觉绝对同步，可以强制刷一次 transform，但通常不需要
+            transform.position = state.position;
+            transform.rotation = Quaternion.Euler(0, 0, state.rotation);
+        }
+        else
+        {
+            // 如果没有刚体，直接操作 Transform
+            transform.position = state.position;
+            transform.rotation = Quaternion.Euler(0, 0, state.rotation);
         }
     }
 
     public void SetRewindMode(bool isRewinding)
     {
+
         if (animator != null)
+            animator.enabled = !isRewinding;
+
+        if (rb != null)
         {
-            animator.enabled = !isRewinding;// 回溯时禁用动画，避免动画干扰位置
+            if (isRewinding)
+            {
+                // 完全停止物理模拟，刚体变成静态，不受重力、碰撞影响
+                rb.simulated = false;
+
+            }
+            else
+            {
+                // 回溯结束，恢复物理模拟
+                rb.simulated = true;
+                rb.WakeUp();
+            }
         }
     }
 
-    public void ClearHistory()
-    {
-        history.Clear();
-    }
+    // 提供给外部清理
+    public void ClearHistory() => history.Clear();
 
 }
