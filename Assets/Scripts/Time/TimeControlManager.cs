@@ -34,21 +34,15 @@ public class TimeControlManager : MonoBehaviour
     {
         // 注册时间事件监听器
         EventBus.registerEvent(EventType.TimeFastForwardStart, OnTimeFastForwardStart);
-        EventBus.registerEvent(EventType.TimeFastForwardEnd, OnTimeFastForwardEnd);
         EventBus.registerEvent(EventType.TimeSlowStart, OnTimeSlowStart);
-        EventBus.registerEvent(EventType.TimeSlowEnd, OnTimeSlowEnd);
         EventBus.registerEvent(EventType.TimeRewindStart, OnTimeRewindStart);
-        EventBus.registerEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
     }
     void OnDestroy()
     {
         // 注销时间事件监听器，防止内存泄漏
         EventBus.disRegisterEvent(EventType.TimeFastForwardStart, OnTimeFastForwardStart);
-        EventBus.disRegisterEvent(EventType.TimeFastForwardEnd, OnTimeFastForwardEnd);
         EventBus.disRegisterEvent(EventType.TimeSlowStart, OnTimeSlowStart);
-        EventBus.disRegisterEvent(EventType.TimeSlowEnd, OnTimeSlowEnd);
         EventBus.disRegisterEvent(EventType.TimeRewindStart, OnTimeRewindStart);
-        EventBus.disRegisterEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
     }
 
     // 时间控制事件处理方法
@@ -62,6 +56,7 @@ public class TimeControlManager : MonoBehaviour
     {
         Time.timeScale = defaultTimeScale;
         Debug.Log("时间快进结束，当前timeScale: " + Time.timeScale);
+        EventBus.publish(EventType.TimeFastForwardEnd); 
     }
     void OnTimeSlowStart()
     {
@@ -73,6 +68,7 @@ public class TimeControlManager : MonoBehaviour
     {
         Time.timeScale = defaultTimeScale;
         Debug.Log("时间减速结束，当前timeScale: " + Time.timeScale);
+        EventBus.publish(EventType.TimeSlowEnd);
     }
     void OnTimeRewindStart()
     {
