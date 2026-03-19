@@ -1,5 +1,6 @@
 ﻿// TimeControlManager.cs
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
 ///  时间控制管理器，负责处理时间快进、减速和回溯的逻辑。
@@ -50,7 +51,18 @@ public class TimeControlManager : MonoBehaviour
     {
         Time.timeScale = fastForwardScale;
         Debug.Log("时间快进开始，当前timeScale: " + Time.timeScale);
-        Invoke(nameof(OnTimeFastForwardEnd), skillDuration);
+
+        if (gameObject.activeSelf) // 确保对象处于激活状态
+        {
+            StopCoroutine(nameof(FastForwardRoutine)); // 停止之前的协程，防止叠加
+        }
+        
+        StartCoroutine(nameof(FastForwardRoutine)); // 启动快进持续时间的协程
+    }
+    private IEnumerator FastForwardRoutine()
+    {
+        yield return new WaitForSecondsRealtime(skillDuration); // 等待技能持续时间（使用实时等待，忽略timeScale）
+        OnTimeFastForwardEnd(); // 快进结束
     }
     void OnTimeFastForwardEnd()
     {
@@ -62,7 +74,17 @@ public class TimeControlManager : MonoBehaviour
     {
         Time.timeScale = slowScale;
         Debug.Log("时间减速开始，当前timeScale: " + Time.timeScale);
-        Invoke(nameof(OnTimeSlowEnd), skillDuration);
+
+        if(gameObject.activeSelf) // 确保对象处于激活状态
+        {
+            StopCoroutine(nameof(SlowRoutine)); // 停止之前的协程，防止叠加
+        }
+        StartCoroutine(nameof(SlowRoutine)); // 启动减速持续时间的协程
+    }
+    private IEnumerator SlowRoutine()
+    {
+        yield return new WaitForSecondsRealtime(skillDuration); // 等待技能持续时间（使用实时等待，忽略timeScale）
+        OnTimeSlowEnd(); // 减速结束
     }
     void OnTimeSlowEnd()
     {

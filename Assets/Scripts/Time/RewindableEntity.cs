@@ -23,7 +23,6 @@ public class RewindableEntity: MonoBehaviour
     private Animator animator; 
 
     private List<EntityState> history;// 状态历史缓冲区
-    private int writeIndex = 0;// 当前写入位置
 
     private void Awake()
     {
