@@ -1,30 +1,48 @@
 ﻿// GlobalRewindManager.cs
 using UnityEngine;
 using System.Collections.Generic;
-using System.Linq;
 using System.Collections;
+
+public enum RewindPhase
+{
+    None,
+    RewindBack,// 倒带阶段
+    RewindForward// 复位阶段
+}
 
 public class GlobalRewindManager : MonoBehaviour
 {
-    public static GlobalRewindManager Instance { get; private set; }// 单例模式，方便全局访问
+    public static GlobalRewindManager Instance { get; private set; }
 
-    [Header("回溯参数")]
-    public float rewindDuration = 3.0f;// 回溯持续时间
-    public float rewindSpeed = 1.0f;// 回溯速度
+    [Header("倒带参数")]
+    public float rewindBackDuration = 3.0f;// 倒带阶段持续时间
+    public float rewindBackSpeed = 0.7f;// 倒带速度倍率
+    [Tooltip("倒带结束后停顿时间")]
+    public float postRewindPause = 0.5f;// 倒带结束后停顿时间
 
-    [Header("调试")]
-    public bool isRewinding = false;// 是否正在回溯
+    [Header("复位参数")]
+    [Tooltip("复位阶段持续时间，默认为0表示自动计算为刚好回到初始点所需时间")]
+    public float rewindForwardDuration = 0f;// 复位阶段持续时间
+    public float rewindForwardSpeed = 1.0f;// 复位速度倍率
 
-    private List<RewindableEntity> allEntities = new List<RewindableEntity>();// 场景中所有可回溯实体的列表
-    private Coroutine rewindCoroutine;// 回溯协程的引用
+    [Header("调试选项")]
+    public bool debugMode = true;// 是否启用调试日志
+    public bool isRewinding = false;// 当前是否处于倒带状态
+    public RewindPhase currentPhase = RewindPhase.None;// 当前回溯阶段
 
-    void Awake()
+    private List<RewindableEntity> allEntities = new List<RewindableEntity>();// 所有可回溯实体的列表
+    private Coroutine rewindCoroutine;// 当前正在运行的倒带协程
+
+    // 记录回溯开始时的状态基准
+    private int backTargetOffset = 0;// 倒带阶段需要回溯的帧数
+    private int startHistoryDepth = 0;
+
+    private void Awake()
     {
-        // 实现单例模式
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject); // 切换场景时不销毁
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -33,29 +51,26 @@ public class GlobalRewindManager : MonoBehaviour
         }
     }
 
-    void Start()
+    private void Start()
     {
-
-        // 注册时间事件监听器
         EventBus.registerEvent(EventType.TimeRewindStart, OnTimeRewindStart);
+
     }
 
-    // 每帧记录所有实体状态
     private void FixedUpdate()
     {
-        if(isRewinding)
+        if (isRewinding || Instance == null )
         {
-            return;// 回溯过程中不记录状态，避免干扰回溯
+            return;
         }
 
-        foreach (var entity in allEntities)
+        foreach (var entity in allEntities )
         {
-            if (entity != null)
+            if(entity != null)
             {
                 entity.RecordState();
             }
         }
-
     }
 
     public void OnTimeRewindStart()
@@ -63,113 +78,153 @@ public class GlobalRewindManager : MonoBehaviour
         StartRewind();
     }
 
-    // 开始回溯
     public void StartRewind()
     {
         if (isRewinding)
         {
-            Debug.Log("已经在回溯中，无法再次开始回溯");
+            if (debugMode) Debug.LogWarning("已经在倒带中，无法再次启动倒带。");
             return;
         }
-        
         if (allEntities.Count == 0)
         {
-            Debug.Log("没有可回溯的实体，无法开始回溯");
+            if (debugMode) Debug.LogWarning("没有可回溯的实体，无法启动倒带。");
             return;
         }
 
-        // 计算深度
-        int minDepth = GetMinHistoryDepth();// 获取所有实体中最短的历史记录深度，确保回溯时不会越界
-
-        if (minDepth <= 0)
+        // 获取所有实体中最短的历史深度
+        int minDepth = GetMinHistoryDepth();
+        if(minDepth <= 0)
         {
-            Debug.Log("没有足够的历史记录，无法开始回溯");
+            if (debugMode) Debug.LogWarning("所有实体的历史深度都不足，无法启动倒带。");
             return;
         }
 
-        // 计算需要回溯的帧数
-        float fixedDt = Time.fixedDeltaTime > 0 ? Time.fixedDeltaTime : 0.02f;// 确保fixedDeltaTime有效，默认0.02秒
-        int totalFramesNeeded = Mathf.CeilToInt(rewindDuration / fixedDt);// 根据回溯持续时间和fixedDeltaTime计算需要回溯的总帧数
+        // 计算倒带阶段需要回溯的帧数
+        float fixedDt = Time.fixedDeltaTime > 0 ? Time.fixedDeltaTime : 0.02f; // 默认0.02s
+        int rewindBackFrames = Mathf.CeilToInt( rewindBackDuration / fixedDt); // 根据倒带持续时间和速度计算需要回溯的帧数
+        
+        // 确保不超过历史极限
+        backTargetOffset = Mathf.Min(rewindBackFrames, minDepth - 1); // -1因为offset是从0开始的
 
-        int framesToRewind = Mathf.Min(totalFramesNeeded, minDepth);// 实际回溯的帧数不能超过最短历史记录深度
+        if (backTargetOffset <= 0)
+        {
+            if (debugMode) Debug.LogWarning("计算得到的倒带帧数为0，无法启动倒带。");
+            return;
+        }
 
-        Debug.Log($"[回溯准备] 实体数={allEntities.Count},目标帧={framesToRewind},速度={rewindSpeed}");
+        startHistoryDepth = minDepth;// 记录开始倒带时的历史深度，供复位阶段使用
+
+        if (debugMode) Debug.Log($"[回溯准备]倒带阶段目标偏移：{backTargetOffset}帧，速度：{rewindBackSpeed},复位阶段速度：{rewindForwardSpeed}");
 
         isRewinding = true;
+        currentPhase = RewindPhase.RewindBack;
 
-        // 启动回溯协程
-        if (rewindCoroutine != null)
+        if(rewindCoroutine != null)
         {
             StopCoroutine(rewindCoroutine);
         }
-        rewindCoroutine = StartCoroutine(RewindProcess(minDepth));
+
+        rewindCoroutine = StartCoroutine(RewindProcess());
     }
 
     private int GetMinHistoryDepth()
     {
-        int minDepth = int.MaxValue;// 初始化为最大值
-
+        int minDepth = int.MaxValue;
         foreach (var entity in allEntities)
         {
             if (entity != null)
             {
-                int historyCount = entity.GetHistoryCount();
-                minDepth = Mathf.Min(minDepth, historyCount);
+                minDepth = Mathf.Min(minDepth, entity.GetHistoryCount());
             }
         }
 
-        return minDepth == int.MaxValue ? 0 : minDepth;// 如果没有实体，返回0
+        return minDepth == int.MinValue ? 0 : minDepth ;
     }
 
-    private IEnumerator RewindProcess(int totalFrames)
+    private IEnumerator RewindProcess()
     {
-        // 步长：速度越快，每次跳过的帧数越多
-        int step = Mathf.Max(1,Mathf.CeilToInt(rewindSpeed));// 计算每次回溯的步长，确保每次至少回溯1帧
+        float fixedDt = Time.fixedDeltaTime > 0 ? Time.fixedDeltaTime : 0.02f; // 默认0.02s
 
-        //每次迭代的时间：速度越快，每次迭代的时间越短
-        float fixedDt = Time.fixedDeltaTime > 0 ? Time.fixedDeltaTime : 0.02f;// 确保fixedDeltaTime有效，默认0.02秒
-        float waitTime = fixedDt / rewindSpeed;// 计算每次回溯之间的等待时间，确保回溯速度正确
+
+        // ================ phase 1: 倒带阶段 ================
+        if(debugMode) Debug.Log($"[回溯阶段1]开始倒带阶段");
+
+        int step1 = Mathf.Max(1, Mathf.CeilToInt(rewindBackSpeed)); // 每次回溯的步长，至少1帧
+        
+        float waitTime1 = (fixedDt * step1) / rewindBackSpeed; // 根据速度调整等待时间
 
         int currentOffset = 0;
 
-        while (currentOffset < totalFrames)
+        while (currentOffset < backTargetOffset)
         {
-            foreach (var entity in allEntities)
+            ApplyStateToAllEntities(currentOffset);
+            currentOffset += step1;
+
+            if(currentOffset > backTargetOffset)
             {
-                if (entity != null && entity.TryGetStateAtOffset(currentOffset, out EntityState state))
-                {
-                    entity.ApplyState(state);
-                }
+                currentOffset = backTargetOffset; // 确保不超过目标偏移
             }
-            currentOffset += step;
-            yield return new WaitForSecondsRealtime(waitTime);// 使用WaitForSecondsRealtime确保回溯过程不受Time.timeScale影响
+
+            yield return new WaitForSeconds(waitTime1);
         }
 
-        // 确保最后停在最远的那一帧
-        int finalOffset = totalFrames - 1;
-        if (finalOffset >= 0)
+        ApplyStateToAllEntities(backTargetOffset); // 确保最终状态正确
+
+        if(debugMode) Debug.Log($"[回溯阶段1]完成倒带阶段，实际偏移：{currentOffset}帧");
+
+        yield return new WaitForSeconds(postRewindPause); // 倒带阶段结束后短暂停顿
+
+        // ================ phase 2: 复位阶段 ================
+        if(debugMode) Debug.Log($"[回溯阶段2]开始复位阶段");
+        currentPhase = RewindPhase.RewindForward;
+
+        int step2 = Mathf.Max(1, Mathf.CeilToInt(rewindForwardSpeed)); // 每次复位的步长，至少1帧
+        float waitTime2 = (fixedDt * step2) / rewindForwardSpeed; // 根据速度调整等待时间
+
+        int forwardOffset = backTargetOffset; // 从倒带结束的偏移开始复位
+
+        while (forwardOffset > 0)
         {
-            foreach (var entity in allEntities)
+            forwardOffset -= step2;
+            if(forwardOffset < 0)
             {
-                if (entity != null && entity.TryGetStateAtOffset(currentOffset, out EntityState state))
-                {
-                    entity.ApplyState(state);
-                }
+                forwardOffset = 0; // 确保不超过初始状态
             }
+            ApplyStateToAllEntities(forwardOffset);
+
+            yield return new WaitForSeconds(waitTime2);
         }
 
+        ApplyStateToAllEntities(0); // 确保最终状态正确
+
+        if(debugMode) Debug.Log($"[回溯阶段2]完成复位阶段，实际偏移：{forwardOffset}帧");
+
+        // ================ 清理 ================
         isRewinding = false;
-        Debug.Log("[倒流过程] 回溯结束，所有实体状态已恢复到目标帧");
-        EventBus.publish(EventType.TimeRewindEnd);// 发布回溯结束事件，通知其他系统回溯已完成
-
+        currentPhase = RewindPhase.None;
+        EventBus.publish(EventType.TimeRewindEnd);
     }
 
-    // 当有实体被动态创建或销毁时，调用以下方法进行注册或注销
+    private void ApplyStateToAllEntities(int offset)
+    {
+        foreach (var entity in allEntities)
+        {
+            if (entity != null)
+            {
+                if (entity.TryGetStateAtOffset(offset, out var state))
+                {
+                    entity.ApplyState(state);
+                }
+            }
+        }
+    }
+
     public void RegisterEntity(RewindableEntity entity)
     {
-        if (entity != null && !allEntities.Contains(entity))
+        if (!allEntities.Contains(entity))
         {
             allEntities.Add(entity);
+            if (debugMode) Debug.Log($"实体注册到回溯管理器: {entity.gameObject.name}, 当前总数: {allEntities.Count}");
         }
     }
     public void UnregisterEntity(RewindableEntity entity)
@@ -177,6 +232,7 @@ public class GlobalRewindManager : MonoBehaviour
         if (allEntities.Contains(entity))
         {
             allEntities.Remove(entity);
+            if (debugMode) Debug.Log($"实体从回溯管理器注销: {entity.gameObject.name}, 当前总数: {allEntities.Count}");
         }
     }
 }
