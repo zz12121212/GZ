@@ -23,6 +23,7 @@ public class RewindableEntity: MonoBehaviour
     private Animator animator; 
 
     private List<EntityState> history;// 状态历史缓冲区
+    private bool isRegistered = false;// 是否已注册到全局管理器
 
     private void Awake()
     {
@@ -35,7 +36,7 @@ public class RewindableEntity: MonoBehaviour
 
     private void OnEnable()
     {
-        GlobalRewindManager.Instance?.RegisterEntity(this);// 注册到全局管理器
+        TryRegister();// 注册到全局管理器
 
         EventBus.registerEvent(EventType.TimeRewindStart, OnTimeRewindStart);
         EventBus.registerEvent(EventType.TimeRewindEnd, OnTimeRewindEnd);
@@ -53,6 +54,23 @@ public class RewindableEntity: MonoBehaviour
         if (GlobalRewindManager.Instance != null)
         {
             GlobalRewindManager.Instance.UnregisterEntity(this);// 注销
+        }
+    }
+
+    private void Start()
+    {
+        if (!isRegistered)
+        {
+            TryRegister();
+        }
+    }
+
+    private void TryRegister()
+    {
+        if (GlobalRewindManager.Instance != null)
+        {
+            GlobalRewindManager.Instance.RegisterEntity(this);
+            isRegistered = true;
         }
     }
 
