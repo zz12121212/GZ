@@ -26,7 +26,7 @@ public class GlobalRewindManager : MonoBehaviour
     public float rewindForwardSpeed = 1.0f;// 复位速度倍率
 
     [Header("调试选项")]
-    public bool debugMode = true;// 是否启用调试日志
+    public bool debugMode = false;// 是否启用调试日志
     public bool isRewinding = false;// 当前是否处于倒带状态
     public RewindPhase currentPhase = RewindPhase.None;// 当前回溯阶段
 
@@ -138,7 +138,7 @@ public class GlobalRewindManager : MonoBehaviour
             }
         }
 
-        return minDepth == int.MinValue ? 0 : minDepth ;
+        return minDepth == int.MaxValue ? 0 : minDepth ;
     }
 
     private IEnumerator RewindProcess()

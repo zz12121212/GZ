@@ -24,6 +24,7 @@ public class RewindableEntity: MonoBehaviour
 
     private List<EntityState> history;// 状态历史缓冲区
     private bool isRegistered = false;// 是否已注册到全局管理器
+    private bool debugMode = false;// 是否启用调试日志
 
     private void Awake()
     {

@@ -8,6 +8,7 @@ using UnityEngine;
 public class SkillManager : MonoBehaviour
 {
     private bool isSkillActive = false;
+    private bool debugMode = false;
 
     void Start()
     {
@@ -34,35 +35,35 @@ public class SkillManager : MonoBehaviour
         {
             isSkillActive = true;
             EventBus.publish(EventType.TimeFastForwardStart);
-            Debug.Log("E技能触发：时间快进,广播已发出");
+            if (debugMode) Debug.Log("E技能触发：时间快进,广播已发出");
         }
         else if (Input.GetKeyDown(KeyCode.Q))
         {
             isSkillActive = true;
             EventBus.publish(EventType.TimeSlowStart);
-            Debug.Log("Q技能触发：时间慢速,广播已发出");
+            if (debugMode) Debug.Log("Q技能触发：时间慢速,广播已发出");
         }
         else if (Input.GetKeyDown(KeyCode.R))
         {
             isSkillActive = true;
             EventBus.publish(EventType.TimeRewindStart);
-            Debug.Log("R技能触发：时间倒流,广播已发出");
+            if (debugMode) Debug.Log("R技能触发：时间倒流,广播已发出");
         }
     }
 
     private void OnTimeFastForwardEnd()
     {
-        Debug.Log("时间快进结束，技能状态重置");
+        if (debugMode) Debug.Log("时间快进结束，技能状态重置");
         isSkillActive = false;
     }
     private void OnTimeSlowEnd()
     {
-        Debug.Log("时间慢速结束，技能状态重置");
+        if (debugMode) Debug.Log("时间慢速结束，技能状态重置");
         isSkillActive = false;
     }
     private void OnTimeRewindEnd()
     {
-        Debug.Log("时间倒流结束，技能状态重置");
+        if (debugMode) Debug.Log("时间倒流结束，技能状态重置");
         isSkillActive = false;
     }
 }

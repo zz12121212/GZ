@@ -15,6 +15,7 @@ public class PlayerAction : MonoBehaviour
     public float moveSpeed = 5f;
 
     private Vector2 moveInput;// 玩家输入的移动方向
+    private bool debugMode = false;// 是否启用调试日志
 
     void Start()
     {
@@ -22,17 +23,17 @@ public class PlayerAction : MonoBehaviour
         if (rb == null)
         {
             rb = GetComponent<Rigidbody2D>();
-            Debug.Log("Rigidbody2D组件未设置，已自动获取。");
+            if (debugMode) Debug.Log("Rigidbody2D组件未设置，已自动获取。");
         }
         if (animator == null)
         {
             animator = GetComponent<Animator>();
-            Debug.Log("Animator组件未设置，已自动获取。");
+            if (debugMode) Debug.Log("Animator组件未设置，已自动获取。");
         }
         if (rb != null)
         {
             rb.freezeRotation = true;
-            Debug.Log("Rigidbody2D组件已设置，冻结旋转。");
+            if (debugMode) Debug.Log("Rigidbody2D组件已设置，冻结旋转。");
         }
 
         // 注册时间事件监听器
@@ -75,7 +76,7 @@ public class PlayerAction : MonoBehaviour
             {
                 animator.speed = 1f;
             }
-            Debug.Log($"TimeScale: {Time.timeScale}, AnimatorSpeed: {animator.speed}");
+            if (debugMode) Debug.Log($"TimeScale: {Time.timeScale}, AnimatorSpeed: {animator.speed}");
         }
     }
 
@@ -97,7 +98,7 @@ public class PlayerAction : MonoBehaviour
     void OnTimeFastForwardStart()
     {
         animator.SetTrigger("AttackE");
-        Debug.Log("时间快进开始，玩家触发E技能动画");
+        if (debugMode) Debug.Log("时间快进开始，玩家触发E技能动画");
     }
     void OnTimeFastForwardEnd()
     {
@@ -106,7 +107,7 @@ public class PlayerAction : MonoBehaviour
     void OnTimeSlowStart()
     {
         animator.SetTrigger("AttackQ");
-        Debug.Log("时间慢速开始，玩家触发Q技能动画");
+        if (debugMode) Debug.Log("时间慢速开始，玩家触发Q技能动画");
     }
     void OnTimeSlowEnd()
     {
@@ -115,7 +116,7 @@ public class PlayerAction : MonoBehaviour
     void OnTimeRewindStart()
     {
         animator.SetTrigger("AttackR");
-        Debug.Log("时间倒流开始，玩家触发R技能动画");
+        if (debugMode) Debug.Log("时间倒流开始，玩家触发R技能动画");
     }
     void OnTimeRewindEnd()
     {

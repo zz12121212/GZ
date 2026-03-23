@@ -17,6 +17,8 @@ public class TimeControlManager : MonoBehaviour
     [Header("技能持续时间")]
     public float skillDuration = 3.0f;
 
+    private bool debugMode = false;// 是否启用调试日志
+
     private void Awake()
     {
         // 实现单例模式
@@ -50,7 +52,7 @@ public class TimeControlManager : MonoBehaviour
     void OnTimeFastForwardStart()
     {
         Time.timeScale = fastForwardScale;
-        Debug.Log("时间快进开始，当前timeScale: " + Time.timeScale);
+        if (debugMode) Debug.Log("时间快进开始，当前timeScale: " + Time.timeScale);
 
         if (gameObject.activeSelf) // 确保对象处于激活状态
         {
@@ -67,13 +69,13 @@ public class TimeControlManager : MonoBehaviour
     void OnTimeFastForwardEnd()
     {
         Time.timeScale = defaultTimeScale;
-        Debug.Log("时间快进结束，当前timeScale: " + Time.timeScale);
+        if (debugMode) Debug.Log("时间快进结束，当前timeScale: " + Time.timeScale);
         EventBus.publish(EventType.TimeFastForwardEnd); 
     }
     void OnTimeSlowStart()
     {
         Time.timeScale = slowScale;
-        Debug.Log("时间减速开始，当前timeScale: " + Time.timeScale);
+        if (debugMode) Debug.Log("时间减速开始，当前timeScale: " + Time.timeScale);
 
         if(gameObject.activeSelf) // 确保对象处于激活状态
         {
@@ -89,7 +91,7 @@ public class TimeControlManager : MonoBehaviour
     void OnTimeSlowEnd()
     {
         Time.timeScale = defaultTimeScale;
-        Debug.Log("时间减速结束，当前timeScale: " + Time.timeScale);
+        if (debugMode) Debug.Log("时间减速结束，当前timeScale: " + Time.timeScale);
         EventBus.publish(EventType.TimeSlowEnd);
     }
     void OnTimeRewindStart()
