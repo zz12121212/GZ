@@ -3,15 +3,21 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - HammerDamage
+  - WaveDamage
+  - TrapDamage
+  - Wall
+  - Ground
+  - SightDamage
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Ground
   - Water
   - UI
-  - 
+  - Wall
   - 
   - 
   - 
@@ -40,4 +46,13 @@ TagManager:
   m_SortingLayers:
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: UnderScene
+    uniqueID: 478422701
+    locked: 0
+  - name: Player
+    uniqueID: 1370854133
+    locked: 0
+  - name: FrontScene
+    uniqueID: 913121083
     locked: 0
